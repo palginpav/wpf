@@ -584,7 +584,7 @@ VOID CBaseMatrix::SetToMultiplyResult(
 void
 CBaseMatrix::SetToZeroMatrix()
 {
-    ZeroMemory(this, sizeof(CBaseMatrix));  
+    ZeroMemory((void*)this, sizeof(CBaseMatrix));  
     _44 = 1.0f;
 }
 

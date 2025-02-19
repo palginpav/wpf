@@ -64,7 +64,7 @@ MtDefine(CMilCameraDuce, CameraResource, "CMilCameraDuce");
         }
         else
         {
-            ZeroMemory(pViewMatrix, sizeof(*pViewMatrix));
+            ZeroMemory((void*)pViewMatrix, sizeof(*pViewMatrix));
         }
     }
     

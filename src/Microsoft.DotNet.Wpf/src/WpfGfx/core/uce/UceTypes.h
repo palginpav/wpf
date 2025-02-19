@@ -53,8 +53,8 @@ struct CLayer
             fHasBounds = FALSE;
         }
         pGeometricMaskShape = pGeometricMaskShapeIn;
-        ZeroMemory(&scaleMatrix, sizeof(CMILMatrix));
-        ZeroMemory(&restMatrix, sizeof(CMILMatrix));
+        ZeroMemory((void*)&scaleMatrix, sizeof(CMILMatrix));
+        ZeroMemory((void*)&restMatrix, sizeof(CMILMatrix));
         surfaceScaleX = 1.0f;
         surfaceScaleY = 1.0f;
         uIntermediateWidth = 0;

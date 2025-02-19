@@ -225,7 +225,7 @@ CMILMesh3D::CalculateNormals()
             // We'll be +='ing on m_pvec3Normals below so let's clear
             // the memory
             memset(
-                m_pvec3Normals,
+                (void*)m_pvec3Normals,
                 0,
                 m_cbNormals
                 );
@@ -482,7 +482,7 @@ CMILMesh3D::CopyPositionsFrom(
             Assert(m_pvec3Vertices);
 
             memcpy(
-                m_pvec3Vertices,
+                (void*)m_pvec3Vertices,
                 pVertexPositions,
                 m_cbPositions
                 );
@@ -535,7 +535,7 @@ CMILMesh3D::CopyNormalsFrom(
     {
         size_t smallerSize = min(cbSize, m_cbNormals);
         memcpy(
-            m_pvec3Normals,
+            (void*)m_pvec3Normals,
             pVertexNormals,
             smallerSize
             );
@@ -573,8 +573,8 @@ CMILMesh3D::CopyTextureCoordinatesFrom(
             if (m_cbTextureCoordinates == cbSize)
             {
                 memcpy(
-                    m_pvec2TextureCoordinates,
-                    pVertexTextureCoordinates,
+                    (void*)m_pvec2TextureCoordinates,
+                    (void*)pVertexTextureCoordinates,
                     m_cbTextureCoordinates
                     );
             }
@@ -586,7 +586,7 @@ CMILMesh3D::CopyTextureCoordinatesFrom(
         else
         {
             memset(
-                m_pvec2TextureCoordinates,
+                (void*)m_pvec2TextureCoordinates,
                 0,
                 m_cbTextureCoordinates
                 );
@@ -642,7 +642,7 @@ CMILMesh3D::CopyTextureCoordinatesFromDoubles(
         else
         {
             memset(
-                m_pvec2TextureCoordinates,
+                (void*)m_pvec2TextureCoordinates,
                 0,
                 m_cbTextureCoordinates
                 );

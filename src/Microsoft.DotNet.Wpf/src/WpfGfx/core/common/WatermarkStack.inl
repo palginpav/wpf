@@ -94,7 +94,7 @@ HRESULT CWatermarkStack<TValue, TMinCapacity, TGrowFactor, TTrimCount>::Push(
 
         Assert(cbOldSize <= (sizeof(TValue) * uNewCapacity));
 
-        memcpy(pNewElements, m_pElements, cbOldSize);
+        memcpy((void*)pNewElements, m_pElements, cbOldSize);
 
         WPFFree(ProcessHeap, m_pElements);
 

@@ -73,7 +73,7 @@ CHwDestinationTexture::CHwDestinationTexture(
 {
     m_pBackgroundTexture = NULL;
 
-    ZeroMemory(&m_backgroundTextureInfo, sizeof(m_backgroundTextureInfo));
+    ZeroMemory((void*)&m_backgroundTextureInfo, sizeof(m_backgroundTextureInfo));
     m_fmtTexture = MilPixelFormat::Undefined;
     m_uTextureWidth = 0;
     m_uTextureHeight = 0;
