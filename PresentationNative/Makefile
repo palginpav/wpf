@@ -1,4 +1,4 @@
-C_SRCS=wrappers.c classification.c
+C_SRCS=wrappers.c classification.c loline.c loservice.c
 
 all: PresentationNative_cor3.dll
 .PHONY: all
