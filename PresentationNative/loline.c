@@ -20,16 +20,62 @@ struct LoLine
     INT *glyph_advance;
 };
 
+static BOOL apply_line_break(struct LoLine *loline, WCHAR wchSpace)
+{
+    struct RunData *run_data;
+    BOOL break_done = FALSE;
+    INT len, i, idx = 0;
+
+    if (loline->num_runs)
+    {
+        len = loline->num_chars;
+        while (len)
+        {
+            if (loline->text[len-1] == wchSpace)
+                break;
+            len--;
+        }
+
+        if (len)
+        {
+            /* We found whitespace, so now we need to find the run with this whitespace and adjust it.
+             * We also need to remove any run that occurred after.
+             */
+            loline->num_chars = len;
+            for (i = 0; i < loline->num_runs; i++)
+            {
+                run_data = loline->run_data + i;
+                if (len > idx && len <= idx + run_data->length)
+                {
+                    /* We have found our run */
+                    loline->num_runs = i + 1;
+                    for (i = len; i < idx + run_data->length; i++)
+                        run_data->width -= loline->glyph_advance[i];
+                    run_data->length = len - idx;
+                    break;
+                }
+                idx += run_data->length;
+            }
+            break_done = TRUE;
+        }
+    }
+
+    return break_done;
+}
+
 enum LsErr WINAPI LoCreateLine(struct LoContext* ploc, INT cp, INT ccpLim, INT durColumn, UINT dwLineFlags,
         void* pInputBreakRec, struct LsLInfo* plslinfo, struct LoLine** pploline, INT* maxDepth, struct LsLineWidths* lineWidths)
 {
     BOOL bufused, ishidden, eol = FALSE;
+    enum LsEndRes endr = endrEndPara;
+    struct LsLineProps line_props;
     struct RunData *run_data;
     INT total_width, chars;
     struct LoLine *loline;
     struct LsTxM metrics;
     WCHAR *text_pointer;
     struct LsChp lschp;
+    struct LsPap pap;
     INT max_runs = 4;
     enum LsErr lserr;
     void *curr_run;
@@ -53,8 +99,20 @@ enum LsErr WINAPI LoCreateLine(struct LoContext* ploc, INT cp, INT ccpLim, INT d
     if (!loline->run_data || !loline->glyph_advance)
         goto out_of_memory;
 
+    if ((lserr = ploc->contextInfo.pfnFetchPap(ploc, cp, &pap)) < 0)
+        goto error;
+
     do
     {
+        if ((lserr = ploc->contextInfo.pfnFetchLineProps(ploc, cp, !loline->num_runs, &line_props)) < 0)
+            goto error;
+
+        if (!loline->num_runs)
+        {
+            lineWidths->upStartMainText = line_props.durLeft;
+            durColumn -= line_props.durLeft;
+        }
+
         if ((lserr = ploc->lscbkRedef.pfnFetchRunRedefined(ploc, cp, 0, NULL, text + loline->num_chars,
                         max_chars - loline->num_chars, &bufused,
                         &text_pointer, &len, &ishidden, &lschp, &curr_run)) < 0)
@@ -66,6 +124,53 @@ enum LsErr WINAPI LoCreateLine(struct LoContext* ploc, INT cp, INT ccpLim, INT d
             if ((lserr = ploc->contextInfo.pfnGetRunCharWidths(loline, curr_run, Presentation, text + loline->num_chars,
                             len, durColumn, lstflowDefault, loline->glyph_advance + loline->num_chars, &total_width, &chars)) < 0)
                 goto error;
+
+            if (pap.grpf & fFmiApplyBreakingRules && total_width > durColumn)
+            {
+                INT orig_width = total_width;
+
+                eol = TRUE;
+                endr = endrNormal;
+                len = chars;
+
+                /* We have exceeded the available column space and we need to apply line breaking.
+                 * We will work backwards within the current run until we find whitespace on which to break.
+                 */
+                while (len)
+                {
+                    if (text[loline->num_chars+len-1] == ploc->contextInfo.wchSpace)
+                        break;
+                    len--;
+                    total_width -= loline->glyph_advance[loline->num_chars+len];
+                }
+
+                /* If no whitespace was found */
+                if (!len)
+                {
+                    /* We'll attempt the line break logic over the rest of the line */
+                    if (apply_line_break(loline, ploc->contextInfo.wchSpace))
+                    {
+                        run_data = loline->run_data + loline->num_runs - 1;
+                        cp = run_data->start_cp + run_data->length;
+                        break;
+                    }
+
+                    /* Otherwise we'll just remove the last character (unless there's only one, and then we'll just keep it) */
+                    len = chars;
+                    total_width = orig_width;
+
+                    if (loline->num_chars + len > 1)
+                    {
+                        len--;
+                        total_width -= loline->glyph_advance[loline->num_chars+len];
+                    }
+                }
+                chars = len;
+
+                /* We don't want to add a run with zero chars */
+                if (!chars)
+                    break;
+            }
 
             if (loline->num_runs == max_runs)
             {
@@ -131,6 +236,8 @@ enum LsErr WINAPI LoCreateLine(struct LoContext* ploc, INT cp, INT ccpLim, INT d
     }
     while (!eol);
 
+    lineWidths->upLimLine = lineWidths->upStartMainText;
+
     for (i = 0; i < loline->num_runs; i++)
     {
         run_data = loline->run_data + i;
@@ -148,8 +255,15 @@ enum LsErr WINAPI LoCreateLine(struct LoContext* ploc, INT cp, INT ccpLim, INT d
         lineWidths->upLimLine += run_data->width;
     }
 
+    if (loline->num_chars)
+    {
+        lineWidths->upMinLimLine = lineWidths->upLimLine;
+        lineWidths->upMinStartTrailing = lineWidths->upStartTrailing =
+            lineWidths->upLimLine - loline->glyph_advance[loline->num_chars-1];
+    }
+
     plslinfo->cpLimToContinue = plslinfo->cpLimToStay = cp;
-    plslinfo->endr = endrEndPara;
+    plslinfo->endr = endr;
     *maxDepth = 1;
 
     return None;
