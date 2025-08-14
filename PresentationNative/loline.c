@@ -169,6 +169,23 @@ enum LsErr WINAPI LoCreateLine(struct LoContext* ploc, INT cp, INT ccpLim, INT d
     if ((lserr = ploc->contextInfo.pfnFetchPap(ploc, cp, &pap)) < 0)
         goto error;
 
+    /* This is an auto numbering run */
+    if (pap.grpf & fFmiAnm)
+    {
+        struct LsChp chp, chpAddedChar;
+        void *plsrun, *plsrunAddedChar;
+        INT word95, anm_offset, width;
+        enum LsKAlign alignment;
+        USHORT addedChar;
+
+        if ((lserr = ploc->contextInfo.pfnGetAutoNumberInfo(ploc, &alignment, &chp, &plsrun, &addedChar,
+                        &chpAddedChar, &plsrunAddedChar, &word95, &anm_offset, &width)) < 0)
+            goto error;
+        /* The cp in an auto numbering run is always negative. This is used to determine that the marker store
+         * should be used (see the StoreFrom method in FullTextState) */
+        cp -= 0x7FFFFFFF;
+    }
+
     do
     {
         if ((lserr = ploc->contextInfo.pfnFetchLineProps(ploc, cp, !loline->num_runs, &line_props)) < 0)
@@ -249,6 +266,9 @@ enum LsErr WINAPI LoCreateLine(struct LoContext* ploc, INT cp, INT ccpLim, INT d
 
                 loline->run_data = run_data;
             }
+
+            if (pap.grpf & fFmiAnm && !loline->num_runs)
+                loline->x_offset = line_props.durLeft - total_width;
 
             run_data = loline->run_data + loline->num_runs;
             run_data->start_cp = cp;
