@@ -13,6 +13,8 @@ struct RunData
 struct LoLine
 {
     struct LoContext *ploc;
+    struct LSPOINT pt;
+    INT x_offset;
     struct RunData *run_data;
     UINT num_runs;
     WCHAR *text;
@@ -174,7 +176,7 @@ enum LsErr WINAPI LoCreateLine(struct LoContext* ploc, INT cp, INT ccpLim, INT d
 
         if (!loline->num_runs)
         {
-            lineWidths->upStartMainText = line_props.durLeft;
+            loline->x_offset = lineWidths->upStartMainText = line_props.durLeft;
             durColumn -= line_props.durLeft;
         }
 
@@ -377,6 +379,9 @@ enum LsErr WINAPI LoDisplayLine(struct LoLine* ploline, struct LSPOINT* pt, UINT
     enum LsErr err = None;
     INT idx = 0, i;
 
+    pt->x += ploline->x_offset;
+    ploline->pt = *pt;
+
     for (i = 0; i < ploline->num_runs && err >= 0; i++)
     {
         run_data = ploline->run_data + i;
@@ -404,6 +409,91 @@ enum LsErr LoEnumLine(struct LoLine* ploline, BOOL reverseOder, BOOL fGeometryne
 enum LsErr WINAPI LoQueryLinePointPcp(struct LoLine* ploline, struct LSPOINT* ptQuery, INT depthQueryMax,
         struct LsQSubInfo* pSubLineInfo, INT* actualDepthQuery, struct LsTextCell* lsTextCell)
 {
-    return None;
+    struct RunData *run_data;
+    enum LsErr err = None;
+    int i, j, x, cp, idx;
+
+    lsTextCell->pointUvStartCell = ploline->pt;
+    x = ploline->pt.x;
+    idx = 0;
+
+    for (i = 0, run_data = ploline->run_data; i < ploline->num_runs; i++)
+    {
+        cp = run_data->start_cp;
+
+        for (j = 0; j < run_data->length && x + ploline->glyph_advance[idx + j] < ptQuery->x; j++, cp++)
+            x += ploline->glyph_advance[idx + j];
+
+        if (x + ploline->glyph_advance[idx + j] >= ptQuery->x) break;
+
+        idx += run_data->length;
+        run_data++;
+    }
+
+    if (i == ploline->num_runs)
+    {
+        run_data--;
+        j = -1;
+        cp--;
+    }
+
+    lsTextCell->lscpStartCell = lsTextCell->lscpEndCell = cp;
+    lsTextCell->cCharsInCell = lsTextCell->cGlyphsInCell = 1;
+    lsTextCell->dupCell = ploline->glyph_advance[idx + j];
+    lsTextCell->pointUvStartCell.x = x;
+
+    pSubLineInfo[0].lscpFirstSubLine = 1;
+    pSubLineInfo[0].plsrun = run_data->run;
+
+    *actualDepthQuery = 1;
+
+    return err;
 }
 
+enum LsErr WINAPI LoQueryLineCpPpoint(struct LoLine* ploline, INT lscpQuery, INT depthQueryMax, struct LsQSubInfo* pSubLineInfo, INT* actualDepthQuery, struct LsTextCell* lsTextCell)
+{
+    struct RunData *run_data = ploline->run_data;
+    int i, j, x, cp, idx;
+
+    lsTextCell->pointUvStartCell = ploline->pt;
+    lsTextCell->cCharsInCell = 1;
+
+    if (!ploline->num_runs)
+        return None;
+
+    x = ploline->pt.x;
+    idx = 0;
+
+    for (i = 0; i < ploline->num_runs; i++, run_data++)
+    {
+        cp = run_data->start_cp;
+
+        for (j = 0; j < run_data->length && cp < lscpQuery; j++, cp++)
+            x += ploline->glyph_advance[idx + j];
+
+        if (i+1 < ploline->num_runs && lscpQuery < run_data[1].start_cp)
+            break;
+
+        idx += run_data->length;
+    }
+
+    if (i == ploline->num_runs)
+    {
+        run_data--;
+        j = -1;
+        cp--;
+    }
+
+    lsTextCell->dupCell = ploline->glyph_advance[idx + j];
+    lsTextCell->pointUvStartCell.x = x;
+    lsTextCell->lscpStartCell = lscpQuery;
+    lsTextCell->lscpEndCell = lscpQuery;
+    lsTextCell->cGlyphsInCell = 1;
+
+    pSubLineInfo[0].lscpFirstSubLine = 1;
+    pSubLineInfo[0].plsrun = run_data->run;
+
+    *actualDepthQuery = 1;
+
+    return None;
+}
