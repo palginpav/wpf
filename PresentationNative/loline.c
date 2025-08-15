@@ -18,6 +18,9 @@ struct LoLine
     WCHAR *text;
     UINT num_chars;
     INT *glyph_advance;
+    USHORT *cluster_map;
+    USHORT *glyph_map;
+    struct GlyphOffset *glyph_offset;
 };
 
 static BOOL apply_line_break(struct LoLine *loline, WCHAR wchSpace)
@@ -61,6 +64,68 @@ static BOOL apply_line_break(struct LoLine *loline, WCHAR wchSpace)
     }
 
     return break_done;
+}
+
+static enum LsErr get_glyphs(struct LoLine *loline)
+{
+    USHORT *glyph_prop, *char_prop;
+    INT idx, i, j, glyph_count;
+    struct RunData *run_data;
+    enum LsErr lserr = None;
+    INT *alone;
+    BOOL used;
+
+    alone = calloc(loline->num_chars, sizeof(*alone));
+    glyph_prop = calloc(loline->num_chars, sizeof(*glyph_prop));
+    char_prop = calloc(loline->num_chars, sizeof(*char_prop));
+
+    /* These allocations will be freed when loline is freed, even on error */
+    loline->cluster_map = calloc(loline->num_chars, sizeof(*loline->cluster_map));
+    loline->glyph_map = calloc(loline->num_chars, sizeof(*loline->glyph_map));
+    loline->glyph_offset = calloc(loline->num_chars, sizeof(*loline->glyph_offset));
+
+    if (!alone || !glyph_prop || !char_prop || !loline->cluster_map || !loline->glyph_map || !loline->glyph_offset)
+    {
+        lserr = OutOfMemory;
+        goto error;
+    }
+
+    idx = 0;
+
+    /* TODO: There is room for optimisation here. These calls can handle multiple runs in a single call, however, they expect the same font
+     * size to be used (and possibly other properties too). So for now, we just make one call per run.
+     */
+    for (i = 0; i < loline->num_runs; i++)
+    {
+        run_data = loline->run_data + i;
+
+        /* Some fonts seem to fail this call. In which case we will fallback to DrawTextRun */
+        if (loline->ploc->lscbkRedef.pfnGetGlyphsRedefined(loline, &run_data->run, &run_data->length, 1, &loline->text[idx],
+                    run_data->length, lstflowDefault, &loline->glyph_map[idx], glyph_prop, run_data->length, &used, &loline->cluster_map[idx],
+                    char_prop, alone, &glyph_count) < 0)
+            goto skip_glyphs;
+
+        if ((lserr = loline->ploc->contextInfo.pfnGetGlyphPositions(loline, &run_data->run, &run_data->length, 1, Presentation,
+                        &loline->text[idx], &loline->cluster_map[idx], char_prop, run_data->length, &loline->glyph_map[idx], glyph_prop,
+                        glyph_count, lstflowDefault, &loline->glyph_advance[idx], &loline->glyph_offset[idx])) < 0)
+            goto error;
+
+        /* The glyph_advance values can be modified here, so we need to recalculate the runs width */
+        run_data->width = 0;
+
+        for (j = 0; j < run_data->length; j++)
+            run_data->width += loline->glyph_advance[idx + j];
+
+skip_glyphs:
+        idx += run_data->length;
+    }
+
+error:
+    free(alone);
+    free(glyph_prop);
+    free(char_prop);
+
+    return lserr;
 }
 
 enum LsErr WINAPI LoCreateLine(struct LoContext* ploc, INT cp, INT ccpLim, INT durColumn, UINT dwLineFlags,
@@ -236,6 +301,10 @@ enum LsErr WINAPI LoCreateLine(struct LoContext* ploc, INT cp, INT ccpLim, INT d
     }
     while (!eol);
 
+    /* Attempt to get the glpyhs required for DrawGlyphs */
+    if ((lserr = get_glyphs(loline) < 0))
+        goto error;
+
     lineWidths->upLimLine = lineWidths->upStartMainText;
 
     for (i = 0; i < loline->num_runs; i++)
@@ -272,12 +341,15 @@ out_of_memory:
     lserr = OutOfMemory;
 
 error:
-    if (text) free(text);
+    free(text);
 
     if (loline)
     {
-        if (loline->run_data) free(loline->run_data);
-        if (loline->glyph_advance) free(loline->glyph_advance);
+        free(loline->run_data);
+        free(loline->glyph_advance);
+        free(loline->glyph_offset);
+        free(loline->glyph_map);
+        free(loline->cluster_map);
         free(loline);
     }
 
@@ -291,6 +363,9 @@ enum LsErr WINAPI LoDisposeLine(struct LoLine* ploline, BOOL finalizing)
     free(ploline->run_data);
     free(ploline->text);
     free(ploline->glyph_advance);
+    free(ploline->cluster_map);
+    free(ploline->glyph_map);
+    free(ploline->glyph_offset);
     free(ploline);
 
     return None;
@@ -305,8 +380,14 @@ enum LsErr WINAPI LoDisplayLine(struct LoLine* ploline, struct LSPOINT* pt, UINT
     for (i = 0; i < ploline->num_runs && err >= 0; i++)
     {
         run_data = ploline->run_data + i;
-        err = ploline->ploc->contextInfo.pfnDrawTextRun(ploline, run_data->run, pt, &ploline->text[idx],
-                &ploline->glyph_advance[idx], run_data->length, lstflowDefault, 1, pt, NULL, run_data->width, clipRect);
+        /* If we have a populated glyph_map, we will preference DrawGlyphs over DrawTextRun */
+        if (ploline->glyph_map && ploline->glyph_map[idx])
+            err = ploline->ploc->contextInfo.pfnDrawGlyphs(ploline, run_data->run, &ploline->text[idx],
+                    &ploline->cluster_map[idx], NULL, run_data->length, &ploline->glyph_map[idx], &ploline->glyph_advance[idx],
+                    NULL, &ploline->glyph_offset[idx], NULL, NULL, run_data->length, lstflowDefault, displayMode, pt, NULL, 0, clipRect);
+        else
+            err = ploline->ploc->contextInfo.pfnDrawTextRun(ploline, run_data->run, pt, &ploline->text[idx],
+                    &ploline->glyph_advance[idx], run_data->length, lstflowDefault, 1, pt, NULL, run_data->width, clipRect);
 
         idx += run_data->length;
         pt->x += run_data->width;
