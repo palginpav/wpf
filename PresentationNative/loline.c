@@ -2,8 +2,50 @@
 
 #include "loservice.h"
 
+struct ObjDim
+{
+    struct LsHeights    heightsRef;
+    struct LsHeights    heightsPres;
+    INT                 dur;
+};
+
+typedef enum LsErr WINAPI (*InlineFormat)(
+        void *                      pols,               // Line Layout context
+        void *                      plsrun,             // plsrun
+        INT                         lscpInline,         // first cp of the run
+        INT                         currentPosition,    // inline's current pen location in text direction
+        INT                         rightMargin,        // right margin
+        struct ObjDim *             pobjDim,            // object dimension
+        INT *                       fFirstRealOnLine,   // is this run the first in line; logically boolean
+        INT *                       fPenPositionUsed,   // is pen position used to format object; logically boolean
+        enum LsBrkCond *            breakBefore,        // break condition before this object
+        enum LsBrkCond *            breakAfter          // break condition after this object
+        );
+
+typedef enum LsErr WINAPI (*InlineDraw)(
+        void *                      pols,               // Line Layout context
+        void *                      plsrun,             // plsrun
+        struct LSPOINT *            runOrigin,          // pen position at which to render the object
+        enum LsTFlow                textFlow,           // text flow direction
+        INT                         runWidth            // object width
+        );
+
+struct InlineInit
+{
+    UINT             dwVersion;
+    InlineFormat     pfnFormat;
+    InlineDraw       pfnDraw;
+};
+
+enum Type
+{
+    TextType,
+    InlineObjectType,
+};
+
 struct RunData
 {
+    enum Type type;
     INT start_cp;
     void *run;
     INT length;
@@ -100,6 +142,9 @@ static enum LsErr get_glyphs(struct LoLine *loline)
     for (i = 0; i < loline->num_runs; i++)
     {
         run_data = loline->run_data + i;
+
+        if (run_data->type != TextType)
+            continue;
 
         /* Some fonts seem to fail this call. In which case we will fallback to DrawTextRun */
         if (loline->ploc->lscbkRedef.pfnGetGlyphsRedefined(loline, &run_data->run, &run_data->length, 1, &loline->text[idx],
@@ -271,6 +316,7 @@ enum LsErr WINAPI LoCreateLine(struct LoContext* ploc, INT cp, INT ccpLim, INT d
                 loline->x_offset = line_props.durLeft - total_width;
 
             run_data = loline->run_data + loline->num_runs;
+            run_data->type = TextType;
             run_data->start_cp = cp;
             run_data->run = curr_run;
             run_data->length = chars;
@@ -282,6 +328,44 @@ enum LsErr WINAPI LoCreateLine(struct LoContext* ploc, INT cp, INT ccpLim, INT d
         else if (text_pointer)
         {
             eol = text_pointer[0] == ploc->contextInfo.wchEndPara1 || text_pointer[0] == ploc->contextInfo.wchEndLineInPara;
+
+            /* 0xfffc indicates an inline object */
+            if (text_pointer[0] == 0xfffc)
+            {
+                enum LsBrkCond break_before, break_after;
+                struct InlineInit inline_init;
+                struct ObjDim obj_dim;
+                INT first, pen;
+
+                if ((lserr = ploc->contextInfo.pfnGetObjectHandlerInfo(ploc, 1, &inline_init)) < 0)
+                    goto error;
+
+                if ((lserr = inline_init.pfnFormat(ploc, curr_run, cp, loline->num_chars, durColumn, &obj_dim,
+                                &first, &pen, &break_before, &break_after)) < 0)
+                    goto error;
+
+                plslinfo->dvpAscent = max(plslinfo->dvrAscent, obj_dim.heightsPres.dvAscent);
+                plslinfo->dvpDescent = max(plslinfo->dvrDescent, obj_dim.heightsPres.dvDescent);
+                plslinfo->dvpMultiLineHeight = max(plslinfo->dvrMultiLineHeight, obj_dim.heightsPres.dvMultiLineHeight);
+
+                plslinfo->dvrAscent = max(plslinfo->dvrAscent, obj_dim.heightsRef.dvAscent);
+                plslinfo->dvrDescent = max(plslinfo->dvrDescent, obj_dim.heightsRef.dvDescent);
+                plslinfo->dvrMultiLineHeight = max(plslinfo->dvrMultiLineHeight, obj_dim.heightsRef.dvMultiLineHeight);
+
+                run_data = loline->run_data + loline->num_runs;
+                run_data->type = InlineObjectType;
+                run_data->start_cp = cp;
+                run_data->run = curr_run;
+                run_data->width = obj_dim.dur;
+                loline->num_runs++;
+                if (pap.grpf & fFmiApplyBreakingRules && obj_dim.dur > durColumn)
+                {
+                    eol = TRUE;
+                    endr = endrNormal;
+                    run_data->width = durColumn;
+                }
+                durColumn -= obj_dim.dur;
+            }
 
             /* If there are no runs in this line, we still need to calculate its height */
             if (eol && !loline->num_runs)
@@ -333,6 +417,11 @@ enum LsErr WINAPI LoCreateLine(struct LoContext* ploc, INT cp, INT ccpLim, INT d
     {
         run_data = loline->run_data + i;
 
+        lineWidths->upLimLine += run_data->width;
+
+        if (run_data->type != TextType)
+            continue;
+
         ploc->contextInfo.pfnGetRunTextMetrics(ploc, run_data->run, Presentation, lstflowDefault, &metrics);
         plslinfo->dvpAscent = max(plslinfo->dvpAscent, metrics.dvAscent);
         plslinfo->dvpDescent = max(plslinfo->dvpDescent, metrics.dvDescent);
@@ -342,16 +431,22 @@ enum LsErr WINAPI LoCreateLine(struct LoContext* ploc, INT cp, INT ccpLim, INT d
         plslinfo->dvrAscent = max(plslinfo->dvrAscent, metrics.dvAscent);
         plslinfo->dvrDescent = max(plslinfo->dvrDescent, metrics.dvDescent);
         plslinfo->dvrMultiLineHeight = max(plslinfo->dvrMultiLineHeight, metrics.dvMultiLineHeight);
-
-        lineWidths->upLimLine += run_data->width;
     }
 
-    if (loline->num_chars)
+    lineWidths->upMinLimLine = lineWidths->upStartTrailing = lineWidths->upLimLine;
+
+    if (loline->num_chars && loline->run_data[loline->num_runs-1].type == TextType)
     {
-        lineWidths->upMinLimLine = lineWidths->upLimLine;
-        lineWidths->upMinStartTrailing = lineWidths->upStartTrailing =
-            lineWidths->upLimLine - loline->glyph_advance[loline->num_chars-1];
+        run_data = loline->run_data + loline->num_runs - 1;
+
+        len = loline->num_chars - 1;
+
+        /* the start trailing width does not include whitespace */
+        for (i = run_data->length - 1; i >= 0 && text[len] == ' '; i--)
+            lineWidths->upStartTrailing -= loline->glyph_advance[len--];
     }
+
+    lineWidths->upMinStartTrailing = lineWidths->upStartTrailing;
 
     plslinfo->cpLimToContinue = plslinfo->cpLimToStay = cp;
     plslinfo->endr = endr;
@@ -405,6 +500,13 @@ enum LsErr WINAPI LoDisplayLine(struct LoLine* ploline, struct LSPOINT* pt, UINT
     for (i = 0; i < ploline->num_runs && err >= 0; i++)
     {
         run_data = ploline->run_data + i;
+
+        if (run_data->type != TextType)
+        {
+            pt->x += run_data->width;
+            continue;
+        }
+
         /* If we have a populated glyph_map, we will preference DrawGlyphs over DrawTextRun */
         if (ploline->glyph_map && ploline->glyph_map[idx])
             err = ploline->ploc->contextInfo.pfnDrawGlyphs(ploline, run_data->run, &ploline->text[idx],
@@ -429,37 +531,54 @@ enum LsErr LoEnumLine(struct LoLine* ploline, BOOL reverseOder, BOOL fGeometryne
 enum LsErr WINAPI LoQueryLinePointPcp(struct LoLine* ploline, struct LSPOINT* ptQuery, INT depthQueryMax,
         struct LsQSubInfo* pSubLineInfo, INT* actualDepthQuery, struct LsTextCell* lsTextCell)
 {
-    struct RunData *run_data;
+    struct RunData *run_data = NULL;
     enum LsErr err = None;
-    int i, j, x, cp, idx;
+    int i, x, cp, idx;
 
     lsTextCell->pointUvStartCell = ploline->pt;
+
+    if (!ploline->num_runs)
+        return None;
+
     x = ploline->pt.x;
     idx = 0;
 
-    for (i = 0, run_data = ploline->run_data; i < ploline->num_runs; i++)
+    /* find the correct run */
+    for (i = 0; i < ploline->num_runs; i++)
     {
+        run_data = ploline->run_data + i;
         cp = run_data->start_cp;
+        /* we'll break if we've found the right run or this is the last run */
+        if (ptQuery->x < x + run_data->width || i + 1 == ploline->num_runs)
+            break;
 
-        for (j = 0; j < run_data->length && x + ploline->glyph_advance[idx + j] < ptQuery->x; j++, cp++)
-            x += ploline->glyph_advance[idx + j];
-
-        if (x + ploline->glyph_advance[idx + j] >= ptQuery->x) break;
-
+        x += run_data->width;
         idx += run_data->length;
-        run_data++;
     }
 
-    if (i == ploline->num_runs)
+    /* if text, we now need to find the correct character */
+    if (run_data->type == TextType)
     {
-        run_data--;
-        j = -1;
-        cp--;
+        for (i = 0; i < run_data->length; i++)
+        {
+            /* we'll break if we've found the right character or this is the last character */
+            if (ptQuery->x < x + ploline->glyph_advance[idx] || i + 1 == run_data->length)
+                break;
+
+            x += ploline->glyph_advance[idx++];
+            cp++;
+        }
+
+        lsTextCell->dupCell = ploline->glyph_advance[idx];
+    }
+    else
+    {
+        lsTextCell->dupCell = run_data->width;
     }
 
+    lsTextCell->pointUvStartCell.x = x;
     lsTextCell->lscpStartCell = lsTextCell->lscpEndCell = cp;
-    lsTextCell->cCharsInCell = lsTextCell->cGlyphsInCell = 1;
-    lsTextCell->dupCell = ploline->glyph_advance[idx + j];
+    lsTextCell->cCharsInCell = lsTextCell->cGlyphsInCell = (run_data->type == TextType);
     lsTextCell->pointUvStartCell.x = x;
 
     pSubLineInfo[0].lscpFirstSubLine = 1;
@@ -470,13 +589,13 @@ enum LsErr WINAPI LoQueryLinePointPcp(struct LoLine* ploline, struct LSPOINT* pt
     return err;
 }
 
-enum LsErr WINAPI LoQueryLineCpPpoint(struct LoLine* ploline, INT lscpQuery, INT depthQueryMax, struct LsQSubInfo* pSubLineInfo, INT* actualDepthQuery, struct LsTextCell* lsTextCell)
+enum LsErr WINAPI LoQueryLineCpPpoint(struct LoLine* ploline, INT lscpQuery, INT depthQueryMax,
+        struct LsQSubInfo* pSubLineInfo, INT* actualDepthQuery, struct LsTextCell* lsTextCell)
 {
     struct RunData *run_data = ploline->run_data;
-    int i, j, x, cp, idx;
+    int i, x, cp, idx;
 
     lsTextCell->pointUvStartCell = ploline->pt;
-    lsTextCell->cCharsInCell = 1;
 
     if (!ploline->num_runs)
         return None;
@@ -484,31 +603,37 @@ enum LsErr WINAPI LoQueryLineCpPpoint(struct LoLine* ploline, INT lscpQuery, INT
     x = ploline->pt.x;
     idx = 0;
 
-    for (i = 0; i < ploline->num_runs; i++, run_data++)
+    /* find the correct run */
+    for (i = 0; i < ploline->num_runs; i++)
     {
+        run_data = ploline->run_data + i;
         cp = run_data->start_cp;
-
-        for (j = 0; j < run_data->length && cp < lscpQuery; j++, cp++)
-            x += ploline->glyph_advance[idx + j];
-
-        if (i+1 < ploline->num_runs && lscpQuery < run_data[1].start_cp)
+        /* we'll break if we've found the right run or this is the last run */
+        if (i+1 == ploline->num_runs || lscpQuery < run_data[1].start_cp)
             break;
 
+        x += run_data->width;
         idx += run_data->length;
     }
 
-    if (i == ploline->num_runs)
+    /* if text, we now need to find the correct character */
+    if (run_data->type == TextType)
     {
-        run_data--;
-        j = -1;
-        cp--;
+        /* advance x and idx until we get to the right character */
+        for (; cp < lscpQuery; cp++)
+            x += ploline->glyph_advance[idx++];
+
+        lsTextCell->dupCell = ploline->glyph_advance[idx];
+    }
+    else
+    {
+        lsTextCell->dupCell = run_data->width;
     }
 
-    lsTextCell->dupCell = ploline->glyph_advance[idx + j];
     lsTextCell->pointUvStartCell.x = x;
     lsTextCell->lscpStartCell = lscpQuery;
     lsTextCell->lscpEndCell = lscpQuery;
-    lsTextCell->cGlyphsInCell = 1;
+    lsTextCell->cCharsInCell = lsTextCell->cGlyphsInCell = (run_data->type == TextType);
 
     pSubLineInfo[0].lscpFirstSubLine = 1;
     pSubLineInfo[0].plsrun = run_data->run;
