@@ -798,7 +798,7 @@ typedef enum LsErr WINAPI (*DrawGlyphs)(
 
 typedef enum LsErr WINAPI (*EnumText)(
     void*                      pols,
-    enum Plsrun                      plsrun,
+    void*                      plsrun,
     INT                         cpFirst,
     INT                         dcp,
     WCHAR                        *pwchText,

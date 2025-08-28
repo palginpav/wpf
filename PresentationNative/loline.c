@@ -523,9 +523,34 @@ enum LsErr WINAPI LoDisplayLine(struct LoLine* ploline, struct LSPOINT* pt, UINT
     return err;
 }
 
-enum LsErr LoEnumLine(struct LoLine* ploline, BOOL reverseOder, BOOL fGeometryneeded, struct LSPOINT *pt)
+enum LsErr LoEnumLine(struct LoLine* loline, BOOL reverseOder, BOOL fGeometryneeded, struct LSPOINT *pt)
 {
-    return None;
+    struct RunData *run_data;
+    enum LsErr lserr = None;
+    BOOL glyph_run;
+    INT i, idx;
+
+    idx = 0;
+    for (i = 0; i < loline->num_runs; i++)
+    {
+        run_data = loline->run_data + i;
+        glyph_run = loline->glyph_map && loline->glyph_map[idx];
+
+        if (run_data->type == TextType)
+        {
+            if ((lserr = loline->ploc->contextInfo.pfnEnumText(loline, run_data->run, run_data->start_cp, run_data->length, loline->text + idx,
+                    run_data->length, lstflowDefault, FALSE, FALSE, pt, NULL /* pheights is not used */, run_data->width,
+                    glyph_run, loline->glyph_advance + idx, loline->cluster_map + idx, NULL, /* characterProperties is not used */
+                    loline->glyph_map + idx, loline->glyph_advance + idx, loline->glyph_offset + idx, NULL, /*pGlyphProperties is not used */
+                    run_data->length)) < 0)
+                break;
+        }
+
+        idx += run_data->length;
+        pt->x += run_data->width;
+    }
+
+    return lserr;
 }
 
 enum LsErr WINAPI LoQueryLinePointPcp(struct LoLine* ploline, struct LSPOINT* ptQuery, INT depthQueryMax,
