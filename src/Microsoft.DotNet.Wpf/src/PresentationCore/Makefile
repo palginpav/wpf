@@ -1,7 +1,7 @@
 
 COMPILE_LIB=csc -target:library
 
-LIB_FLAGS=-unsafe -delaysign+ -keyfile:../../reactive.pub -define:CORE_NATIVEMETHODS -define:PRESENTATION_CORE -define:COMMONDPS -langversion:8.0 -nostdlib -noconfig -lib:$(MONO_PREFIX)/lib/mono/4.5-api
+LIB_FLAGS=-unsafe -debug+ -delaysign+ -keyfile:../../reactive.pub -define:CORE_NATIVEMETHODS -define:PRESENTATION_CORE -define:COMMONDPS -langversion:8.0 -nostdlib -noconfig -lib:$(MONO_PREFIX)/lib/mono/4.5-api
 
 LIB_REFS=-r:mscorlib.dll -r:System.dll -r:System.Xml.dll -r:System.Core.dll -r:System.Security.dll -r:System.Configuration.dll -r:System.IO.Compression.dll
 

@@ -1,7 +1,7 @@
 
 COMPILE_LIB=csc -target:library
 
-LIB_FLAGS=-unsafe -delaysign+ -keyfile:../../ecma.pub -define:RIBBON_IN_FRAMEWORK -langversion:9.0 -nostdlib -noconfig
+LIB_FLAGS=-unsafe -debug+ -delaysign+ -keyfile:../../ecma.pub -define:RIBBON_IN_FRAMEWORK -langversion:9.0 -nostdlib -noconfig
 
 LIB_REFS=-r:mscorlib.dll -r:System.dll -r:System.Xml.dll
 

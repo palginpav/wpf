@@ -1,7 +1,7 @@
 
 COMPILE_LIB=csc -target:library
 
-LIB_FLAGS=-unsafe -keyfile:../../mono.snk -langversion:8.0
+LIB_FLAGS=-unsafe -debug+ -keyfile:../../mono.snk -langversion:8.0
 
 LIB_REFS=-r:mscorlib.dll -r:System.dll -r:System.Xml.dll -r:System.Core.dll
 

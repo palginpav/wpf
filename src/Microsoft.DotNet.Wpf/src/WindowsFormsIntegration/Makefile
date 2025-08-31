@@ -1,7 +1,7 @@
 
 COMPILE_LIB=csc -target:library
 
-LIB_FLAGS=-unsafe -delaysign+ -keyfile:../../winfx3.pub -define:WINDOWSFORMSINTEGRATION
+LIB_FLAGS=-unsafe -debug+ -delaysign+ -keyfile:../../winfx3.pub -define:WINDOWSFORMSINTEGRATION
 
 LIB_REFS=-r:mscorlib.dll -r:System.dll -r:System.Xml.dll -r:System.Core.dll
 

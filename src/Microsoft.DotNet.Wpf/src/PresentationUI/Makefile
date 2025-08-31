@@ -1,7 +1,7 @@
 
 COMPILE_LIB=csc -target:library
 
-LIB_FLAGS=-unsafe -delaysign+ -keyfile:../../reactive.pub -define:PRESENTATIONUI -langversion:8.0 -nostdlib -noconfig
+LIB_FLAGS=-unsafe -debug+ -delaysign+ -keyfile:../../reactive.pub -define:PRESENTATIONUI -langversion:8.0 -nostdlib -noconfig
 
 LIB_REFS=-r:mscorlib.dll -r:System.dll -r:System.Xml.dll -r:System.Core.dll -r:System.Windows.Forms.dll -r:System.Drawing.dll -r:System.DirectoryServices.dll -r:System.Security.dll
 
