@@ -21,15 +21,11 @@ namespace MS.Internal.Text
 
         internal static Encoding GetEncoding(int codepage)
         {
-			// We need to use corefx's encoding implementation to make this work.
-			throw new NotImplementedException ();
             return Encoding.GetEncoding(codepage);
         }
 
         internal static byte[] Convert(System.Text.Encoding srcEncoding, System.Text.Encoding dstEncoding, byte[] bytes)
         {
-			// We need to use corefx's encoding implementation to make this work.
-			throw new NotImplementedException ();
             return Encoding.Convert(srcEncoding, dstEncoding, bytes);
         }
     }
