@@ -396,6 +396,7 @@ enum LsErr WINAPI FsQueryPageDetails(struct DocContext* pfscontext, struct Page*
     rect = &track_desc->fsbbox.fsrc;
     rect->u = pPage->ur;
     rect->dv = pPage->dvr;
+    rect->du = pPage->dur;
     pPageDetails->u.pdsimple.trackdescr.pfstrack = pPage;
 
     return ret;
@@ -483,6 +484,7 @@ enum LsErr WINAPI FsQuerySubtrackParaList(struct DocContext* pfscontext, struct 
                 rgParaDesc[0].fsbbox.fDefined = 1;
                 rgParaDesc[0].nmp = text->nmp;
                 rgParaDesc[0].pfsparaclient = text->paraclient;
+                rgParaDesc[0].dvrUsed = sub_track->dvr;
                 box = &rgParaDesc[0].fsbbox.fsrc;
                 box->u = sub_track->ur;
                 box->v = sub_track->vr;
@@ -555,6 +557,7 @@ enum LsErr WINAPI FsQueryLineListSingle(struct DocContext* pfscontext, struct Su
         rgLineDesc[i].dur = sub_track->dur;
         rgLineDesc[i].fAllowHyphenation = 1;
         rgLineDesc[i].urBBox = line->ur_bbox;
+        rgLineDesc[i].durBBox = line->dur_bbox;
         rgLineDesc[i].vrStart = vrStart;
         rgLineDesc[i].dvrAscent = line->dvr_ascent;
         rgLineDesc[i].dvrDescent = line->dvr_descent;
