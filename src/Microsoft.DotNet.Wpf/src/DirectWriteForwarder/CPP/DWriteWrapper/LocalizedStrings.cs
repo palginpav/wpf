@@ -133,7 +133,7 @@ public class LocalizedStrings : IDictionary<CultureInfo, string>
 		internal LocalizedStringsEnumerator(LocalizedStrings localizedStrings)
 		{
 			_localizedStrings = localizedStrings;
-			_currentIndex = 1;
+			_currentIndex = -1;
 		}
 
 		public virtual bool MoveNext()
