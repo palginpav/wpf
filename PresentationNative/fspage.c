@@ -272,6 +272,60 @@ error:
     return lserr;
 }
 
+static enum LsErr populate_sub_track(struct DocContext* pfscontext, void *fsnmSegment, INT fswdir, INT ur, INT dur,
+        INT vr, INT fSuppressTopSpace, INT iArea, INT *pdvrUsed, struct SubTrack *sub_track)
+{
+    void *nmp, *paraclient = NULL;
+    enum LsErr lserr = None;
+    struct FSPAP props;
+    INT success;
+
+    if ((lserr = pfscontext->fscontextinfo.fscbk.cbkgen.pfnGetFirstPara(pfscontext, fsnmSegment, &success, &nmp)) < 0)
+        goto error;
+
+    if ((lserr = pfscontext->fscontextinfo.fscbk.cbkgen.pfnCreateParaclient(pfscontext, nmp, &paraclient)) < 0)
+        goto error;
+
+    if ((lserr = pfscontext->fscontextinfo.fscbk.cbkgen.pfnGetParaProperties(pfscontext, nmp, &props)) < 0)
+        goto error;
+
+    sub_track->ur = ur;
+    sub_track->vr = vr;
+    sub_track->dur = dur;
+    sub_track->suppress_top_space = fSuppressTopSpace;
+    sub_track->nms = fsnmSegment;
+    sub_track->fsparaclient = paraclient;
+
+    *pdvrUsed = vr;
+
+    switch (sub_track->idobj = props.idobj)
+    {
+        /* Container Paragraph */
+        case 0:
+            if ((lserr = create_container(pfscontext, fsnmSegment, fswdir, ur, dur, pdvrUsed, &sub_track->data.container)) < 0)
+                goto error;
+            break;
+
+        /* Text Paragraph */
+        case -1:
+            if ((lserr = create_text(pfscontext, nmp, iArea, fswdir, ur, dur, pdvrUsed, &sub_track->data.text)) < 0)
+                goto error;
+            break;
+    }
+
+    sub_track->dvr = *pdvrUsed - sub_track->vr;
+
+    return lserr;
+
+error:
+    if (paraclient)
+        pfscontext->fscontextinfo.fscbk.cbkgen.pfnDestroyParaclient(pfscontext, paraclient);
+
+    sub_track->fsparaclient = NULL;
+
+    return lserr;
+}
+
 static enum LsErr populate_page(struct DocContext* pfscontext, struct Page* page, void* fsnmsect, enum FSFMTRBL* pfsfmtrbl)
 {
     INT header_footer_pos, dur_page, dvr_page, dvrUsed = 0;
@@ -328,52 +382,22 @@ enum LsErr WINAPI FsFormatSubtrackBottomless(struct DocContext* pfscontext, void
         INT fCanBeInterruptedIn, enum FSFMTRBL* pfsfmtrbl, void** ppfsSubtrack, INT* pdvrUsed, struct FSBBOX* pfsBBox,
         void** ppfsMcsClientOut, enum FSKCLEAR* pfsKClearOut, INT* pTopSpace, INT* pfCanBeInterruptedOut)
 {
-    struct SubTrack *sub_track = NULL;
-    enum LsErr lserr = None;
-    struct FSPAP props;
-    INT success;
-    void *nmp;
+    struct SubTrack *sub_track;
+    enum LsErr lserr;
 
-    if ((lserr = pfscontext->fscontextinfo.fscbk.cbkgen.pfnGetFirstPara(pfscontext, fsnmSegment, &success, &nmp)) < 0)
-        return lserr;
-
-    if ((lserr = pfscontext->fscontextinfo.fscbk.cbkgen.pfnGetParaProperties(pfscontext, nmp, &props)) < 0)
-        return lserr;
+    *ppfsMcsClientOut = NULL;
+    *pfsfmtrbl = fmtrblGoalReached;
 
     if (!(sub_track = calloc(1, sizeof(*sub_track))))
         return OutOfMemory;
 
-    sub_track->ur = ur;
-    sub_track->vr = vr;
-    sub_track->dur = dur;
-    sub_track->suppress_top_space = fSuppressTopSpace;
-    sub_track->nms = fsnmSegment;
-
-    *pdvrUsed = vr;
-
-    switch (sub_track->idobj = props.idobj)
-    {
-        case 0:
-            if ((lserr = create_container(pfscontext, fsnmSegment, fswdir, ur, dur, pdvrUsed, &sub_track->data.container)) < 0)
-                goto error;
-            break;
-
-        case -1:
-            if ((lserr = create_text(pfscontext, nmp, iArea, fswdir, ur, dur, pdvrUsed, &sub_track->data.text)) < 0)
-                goto error;
-            break;
-    }
-
-    sub_track->dvr = *pdvrUsed - sub_track->vr;
-
-    *ppfsMcsClientOut = NULL;
     *ppfsSubtrack = sub_track;
-    *pfsfmtrbl = fmtrblGoalReached;
 
-    return lserr;
-
-error:
-    free(sub_track);
+    if ((lserr = populate_sub_track(pfscontext, fsnmSegment, fswdir, ur, dur, vr, fSuppressTopSpace, iArea, pdvrUsed, sub_track)) < 0)
+    {
+        *ppfsSubtrack = NULL;
+        free(sub_track);
+    }
 
     return lserr;
 }
