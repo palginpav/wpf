@@ -409,12 +409,28 @@ enum LsErr WINAPI FsQueryTrackDetails(struct DocContext* pfscontext, struct Page
     return None;
 }
 
+static void populate_para_desc(struct SubTrack* sub_track, struct FSPARADESCRIPTION* para_desc)
+{
+    struct FSRECT *box;
+
+    para_desc->pfspara = sub_track;
+    para_desc->pfsparaclient = sub_track->fsparaclient;
+    para_desc->nmp = sub_track->nms;
+
+    para_desc->dvrUsed = sub_track->dvr;
+    para_desc->fsbbox.fDefined = 1;
+    box = &para_desc->fsbbox.fsrc;
+    box->u = sub_track->ur;
+    box->v = sub_track->vr;
+    box->du = sub_track->dur;
+    box->dv = sub_track->dvr;
+}
+
 enum LsErr WINAPI FsQueryTrackParaList(struct DocContext* pfscontext, struct Page* page, INT cParas,
         struct FSPARADESCRIPTION* rgParaDesc, INT* cParaDesc)
 {
     struct FSPARADESCRIPTION *para_desc;
     struct SubTrack *sub_track;
-    struct FSRECT *box;
     INT i;
 
     *cParaDesc = page->container->num_sub_tracks;
@@ -423,17 +439,7 @@ enum LsErr WINAPI FsQueryTrackParaList(struct DocContext* pfscontext, struct Pag
         para_desc = rgParaDesc + i;
         sub_track = page->container->sub_track[i];
 
-        para_desc->pfspara = sub_track;
-        para_desc->pfsparaclient = sub_track->fsparaclient;
-        para_desc->nmp = sub_track->nms;
-
-        para_desc->dvrUsed = sub_track->dvr;
-        para_desc->fsbbox.fDefined = 1;
-        box = &para_desc->fsbbox.fsrc;
-        box->u = sub_track->ur;
-        box->v = sub_track->vr;
-        box->du = sub_track->dur;
-        box->dv = sub_track->dvr;
+        populate_para_desc(sub_track, para_desc);
     }
 
     return None;
