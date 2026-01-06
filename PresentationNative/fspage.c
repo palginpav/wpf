@@ -90,16 +90,6 @@ struct SubTrack
     } data;
 };
 
-struct Page
-{
-    INT ur;
-    INT vr;
-    INT dur;
-    INT dvr;
-    void *nms;
-    struct Container *container;
-};
-
 enum LsErr WINAPI FsDestroySubtrack(struct DocContext* pfscontext, struct SubTrack* pfsSubtrack);
 
 /* The container paragraph is used for building a hierarchy of UI elements. For example: a numbered list which
@@ -204,8 +194,6 @@ static enum LsErr create_text(struct DocContext* pfscontext, void *nmp, INT iAre
     void *paraclient;
     void *line_out;
     INT dcp = 0;
-
-
 
     if (!(text = calloc(1, sizeof(*text))))
         return OutOfMemory;
@@ -326,7 +314,7 @@ error:
     return lserr;
 }
 
-static enum LsErr populate_page(struct DocContext* pfscontext, struct Page* page, void* fsnmsect, enum FSFMTRBL* pfsfmtrbl)
+static enum LsErr populate_page(struct DocContext* pfscontext, struct SubTrack* page, void* fsnmsect, enum FSFMTRBL* pfsfmtrbl)
 {
     INT header_footer_pos, dur_page, dvr_page, dvrUsed = 0;
     enum LsErr lserr = None;
@@ -337,17 +325,11 @@ static enum LsErr populate_page(struct DocContext* pfscontext, struct Page* page
     if ((lserr = pfscontext->fscontextinfo.fscbk.cbkgen.pfnGetMainTextSegment(pfscontext, fsnmsect, &segment)) < 0)
         goto error;
 
-    page->nms = segment;
-
     if ((lserr = pfscontext->fscontextinfo.fscbk.cbkgen.pfnGetPageDimensions(pfscontext, fsnmsect, &dir,
                     &header_footer_pos, &dur_page, &dvr_page, &margin)) < 0)
         goto error;
 
-    page->ur = margin.u;
-    page->dur = margin.du;
-    page->vr = dvrUsed;
-
-    if ((lserr = create_container(pfscontext, segment, dir, margin.u, margin.du, &dvrUsed, &page->container)) < 0)
+    if ((lserr = populate_sub_track(pfscontext, segment, dir, margin.u, margin.du, 0, TRUE, 0, &dvrUsed, page)) < 0)
         goto error;
 
     page->dvr = dvrUsed;
@@ -360,19 +342,18 @@ error:
 
 enum LsErr WINAPI FsCreatePageBottomless(struct DocContext* pfscontext, void* fsnmsect, enum FSFMTRBL *pfsfmtrbl, void **ppfspage)
 {
-    struct Page *page;
+    struct SubTrack *page;
     enum LsErr lserr;
+
+    *ppfspage = NULL;
 
     if (!(page = calloc(1, sizeof(*page))))
         return OutOfMemory;
 
-    *ppfspage = page;
-
     if ((lserr = populate_page(pfscontext, page, fsnmsect, pfsfmtrbl)) < 0)
-    {
         free(page);
-        *ppfspage = NULL;
-    }
+    else
+        *ppfspage = page;
 
     return lserr;
 }
@@ -402,7 +383,7 @@ enum LsErr WINAPI FsFormatSubtrackBottomless(struct DocContext* pfscontext, void
     return lserr;
 }
 
-enum LsErr WINAPI FsQueryPageDetails(struct DocContext* pfscontext, struct Page* pPage, struct FSPAGEDETAILS* pPageDetails)
+enum LsErr WINAPI FsQueryPageDetails(struct DocContext* pfscontext, struct SubTrack* pPage, struct FSPAGEDETAILS* pPageDetails)
 {
     struct FSTRACKDESCRIPTION *track_desc;
     enum LsErr ret = None;
@@ -426,9 +407,20 @@ enum LsErr WINAPI FsQueryPageDetails(struct DocContext* pfscontext, struct Page*
     return ret;
 }
 
-enum LsErr WINAPI FsQueryTrackDetails(struct DocContext* pfscontext, struct Page* page, struct FSTRACKDETAILS* pTrackDetails)
+enum LsErr WINAPI FsQueryTrackDetails(struct DocContext* pfscontext, struct SubTrack* page, struct FSTRACKDETAILS* pTrackDetails)
 {
-    pTrackDetails->cParas = page->container->num_sub_tracks;
+    switch (page->idobj)
+    {
+        /* Container Paragraph */
+        case 0:
+            pTrackDetails->cParas = page->data.container->num_sub_tracks;
+            break;
+
+        /* Text Paragraph */
+        case -1:
+            pTrackDetails->cParas = 1;
+            break;
+    }
 
     return None;
 }
@@ -450,20 +442,32 @@ static void populate_para_desc(struct SubTrack* sub_track, struct FSPARADESCRIPT
     box->dv = sub_track->dvr;
 }
 
-enum LsErr WINAPI FsQueryTrackParaList(struct DocContext* pfscontext, struct Page* page, INT cParas,
+enum LsErr WINAPI FsQueryTrackParaList(struct DocContext* pfscontext, struct SubTrack* page, INT cParas,
         struct FSPARADESCRIPTION* rgParaDesc, INT* cParaDesc)
 {
     struct FSPARADESCRIPTION *para_desc;
     struct SubTrack *sub_track;
     INT i;
 
-    *cParaDesc = page->container->num_sub_tracks;
-    for (i = 0; i < *cParaDesc; i++)
+    switch (page->idobj)
     {
-        para_desc = rgParaDesc + i;
-        sub_track = page->container->sub_track[i];
+        /* Container Paragraph */
+        case 0:
+            *cParaDesc = page->data.container->num_sub_tracks;
+            for (i = 0; i < *cParaDesc; i++)
+            {
+                para_desc = rgParaDesc + i;
+                sub_track = page->data.container->sub_track[i];
 
-        populate_para_desc(sub_track, para_desc);
+                populate_para_desc(sub_track, para_desc);
+            }
+            break;
+
+        /* Text Paragraph */
+        case -1:
+            *cParaDesc = 1;
+            populate_para_desc(page, rgParaDesc);
+            break;
     }
 
     return None;
@@ -483,10 +487,12 @@ enum LsErr WINAPI FsQuerySubtrackDetails(struct DocContext* pfscontext, struct S
 
     switch (sub_track->idobj)
     {
+        /* Text Paragraph */
         case -1:
             pSubTrackDetails->cParas = 1;
             break;
 
+        /* Container Paragraph */
         case 0:
             pSubTrackDetails->cParas = sub_track->data.container->num_sub_tracks;
             break;
@@ -601,7 +607,7 @@ enum LsErr WINAPI FsQueryLineListSingle(struct DocContext* pfscontext, struct Su
     return None;
 }
 
-enum LsErr WINAPI FsClearUpdateInfoInPage(struct DocContext* pfscontext, struct Page* pfspage)
+enum LsErr WINAPI FsClearUpdateInfoInPage(struct DocContext* pfscontext, struct SubTrack* pfspage)
 {
     return None;
 }
@@ -660,27 +666,14 @@ enum LsErr WINAPI FsDestroySubtrack(struct DocContext* pfscontext, struct SubTra
     return None;
 }
 
-enum LsErr WINAPI FsDestroyPage(struct DocContext* pfscontext, struct Page* pfspage)
+enum LsErr WINAPI FsDestroyPage(struct DocContext* pfscontext, struct SubTrack* pfspage)
 {
-    INT i;
-
-    for (i = 0; i < pfspage->container->num_sub_tracks; i++)
-        FsDestroySubtrack(pfscontext, pfspage->container->sub_track[i]);
-
-    free(pfspage->container);
-    free(pfspage);
-
-    return None;
+    return FsDestroySubtrack(pfscontext, pfspage);
 }
 
-enum LsErr WINAPI FsUpdateBottomlessPage(struct DocContext* pfscontext, struct Page* pfspage, void* fsnmsect, enum FSFMTRBL* pfsfmtrbl)
+enum LsErr WINAPI FsUpdateBottomlessPage(struct DocContext* pfscontext, struct SubTrack* pfspage, void* fsnmsect, enum FSFMTRBL* pfsfmtrbl)
 {
-    INT i;
-
-    for (i = 0; i < pfspage->container->num_sub_tracks; i++)
-        FsDestroySubtrack(pfscontext, pfspage->container->sub_track[i]);
-
-    free(pfspage->container);
+    reset_sub_track(pfscontext, pfspage);
 
     return populate_page(pfscontext, pfspage, fsnmsect, pfsfmtrbl);
 }
