@@ -620,7 +620,7 @@ enum LsErr WINAPI DestroyInstalledObjectsInfo(struct InstalledObject* pInstalled
     return None;
 }
 
-enum LsErr WINAPI FsDestroySubtrack(struct DocContext* pfscontext, struct SubTrack* pfsSubtrack)
+static void reset_sub_track(struct DocContext* pfscontext, struct SubTrack* pfsSubtrack)
 {
     switch (pfsSubtrack->idobj)
     {
@@ -650,6 +650,11 @@ enum LsErr WINAPI FsDestroySubtrack(struct DocContext* pfscontext, struct SubTra
     }
 
     pfscontext->fscontextinfo.fscbk.cbkgen.pfnDestroyParaclient(pfscontext, pfsSubtrack->fsparaclient);
+}
+
+enum LsErr WINAPI FsDestroySubtrack(struct DocContext* pfscontext, struct SubTrack* pfsSubtrack)
+{
+    reset_sub_track(pfscontext, pfsSubtrack);
     free(pfsSubtrack);
 
     return None;
