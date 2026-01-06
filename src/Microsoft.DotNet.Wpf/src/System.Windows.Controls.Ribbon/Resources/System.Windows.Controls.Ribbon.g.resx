@@ -71,10 +71,10 @@
   <data name="themes/aero2.normalcolor.xaml" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>Themes/Aero2.NormalColor.xaml;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
-  <data name="component/Images/DefaultSystemIcon.png" type="System.Resources.ResXFileRef, System.Windows.Forms">
+  <data name="images/defaultsystemicon.png" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>Images/DefaultSystemIcon.png;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
-  <data name="component/Images/GlassyDefaultSystemIcon.png" type="System.Resources.ResXFileRef, System.Windows.Forms">
+  <data name="images/glassydefaultsystemicon.png" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>Images/GlassyDefaultSystemIcon.png;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
 </root>
