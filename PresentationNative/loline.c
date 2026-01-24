@@ -352,6 +352,17 @@ enum LsErr WINAPI LoCreateLine(struct LoContext* ploc, INT cp, INT ccpLim, INT d
                 plslinfo->dvrDescent = max(plslinfo->dvrDescent, obj_dim.heightsRef.dvDescent);
                 plslinfo->dvrMultiLineHeight = max(plslinfo->dvrMultiLineHeight, obj_dim.heightsRef.dvMultiLineHeight);
 
+                if (loline->num_runs == max_runs)
+                {
+                    max_runs *= 2;
+                    run_data = realloc(loline->run_data, sizeof(*loline->run_data) * max_runs);
+
+                    if (!run_data)
+                        goto out_of_memory;
+
+                    loline->run_data = run_data;
+                }
+
                 run_data = loline->run_data + loline->num_runs;
                 run_data->type = InlineObjectType;
                 run_data->start_cp = cp;
