@@ -15,6 +15,8 @@ namespace MS.Internal.PresentationCore
 namespace MS.Utility
 #elif AUTOMATION
 namespace MS.Internal.Automation
+#elif UIAUTOMATIONCLIENT
+namespace System
 #elif REACHFRAMEWORK
 namespace System.Windows.Xps
 #elif PRESENTATIONFRAMEWORK
