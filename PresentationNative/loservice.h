@@ -321,6 +321,15 @@ enum LsChpFlags
     // 8 bits of padding
 };
 
+enum ObjectId
+{
+    oidReverse         = 0,
+    oidMaxNative       = 1,
+    oidInlineObject    = 1,
+    oidMax             = 2,
+    oidText_chp        = 0xffff,
+};
+
 struct LSPOINT
 {
     INT x;
@@ -343,7 +352,7 @@ struct LSSIZE
 
 struct LsChp
 {
-    USHORT       idObj;
+    USHORT       idObj; // uses the values from enum ObjectId
     USHORT       dcpMaxContent;
     UINT         effectsFlags;
     enum LsChpFlags        flags;      // bitfields

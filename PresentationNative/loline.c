@@ -65,6 +65,7 @@ struct LoLine
     USHORT *cluster_map;
     USHORT *glyph_map;
     struct GlyphOffset *glyph_offset;
+    BOOL reversed;
 };
 
 static BOOL apply_line_break(struct LoLine *loline, WCHAR wchSpace)
@@ -329,8 +330,8 @@ enum LsErr WINAPI LoCreateLine(struct LoContext* ploc, INT cp, INT ccpLim, INT d
         {
             eol = text_pointer[0] == ploc->contextInfo.wchEndPara1 || text_pointer[0] == ploc->contextInfo.wchEndLineInPara;
 
-            /* 0xfffc indicates an inline object */
-            if (text_pointer[0] == 0xfffc)
+            /* 0xfffc can indicate a reverse or an inline object */
+            if (text_pointer[0] == 0xfffc && lschp.idObj == oidInlineObject)
             {
                 enum LsBrkCond break_before, break_after;
                 struct InlineInit inline_init;
@@ -376,6 +377,10 @@ enum LsErr WINAPI LoCreateLine(struct LoContext* ploc, INT cp, INT ccpLim, INT d
                     run_data->width = durColumn;
                 }
                 durColumn -= obj_dim.dur;
+            }
+            else if (text_pointer[0] == 0xfffc && lschp.idObj == oidReverse)
+            {
+                loline->reversed = TRUE;
             }
 
             /* If there are no runs in this line, we still need to calculate its height */
@@ -508,6 +513,13 @@ enum LsErr WINAPI LoDisplayLine(struct LoLine* ploline, struct LSPOINT* pt, UINT
     pt->x += ploline->x_offset;
     ploline->pt = *pt;
 
+    if (ploline->reversed)
+    {
+        for (i = 0; i < ploline->num_runs; i++)
+            pt->x += ploline->run_data[i].width;
+        pt->x--;
+    }
+
     for (i = 0; i < ploline->num_runs && err >= 0; i++)
     {
         run_data = ploline->run_data + i;
@@ -528,7 +540,10 @@ enum LsErr WINAPI LoDisplayLine(struct LoLine* ploline, struct LSPOINT* pt, UINT
                     &ploline->glyph_advance[idx], run_data->length, lstflowDefault, 1, pt, NULL, run_data->width, clipRect);
 
         idx += run_data->length;
-        pt->x += run_data->width;
+        if (ploline->reversed)
+            pt->x -= run_data->width;
+        else
+            pt->x += run_data->width;
     }
 
     return err;
