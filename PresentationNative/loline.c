@@ -1,6 +1,9 @@
 #include <stdio.h>
 
 #include "loservice.h"
+#include "wine/debug.h"
+
+WINE_DEFAULT_DEBUG_CHANNEL(loline);
 
 struct ObjDim
 {
@@ -381,6 +384,10 @@ enum LsErr WINAPI LoCreateLine(struct LoContext* ploc, INT cp, INT ccpLim, INT d
             else if (text_pointer[0] == 0xfffc && lschp.idObj == oidReverse)
             {
                 loline->reversed = TRUE;
+            }
+            else if (text_pointer[0] == 0xfffc)
+            {
+                WINE_FIXME("Unhandled idObj %d", lschp.idObj);
             }
 
             /* If there are no runs in this line, we still need to calculate its height */

@@ -8,7 +8,7 @@ all: PresentationNative_cor3.dll
 
 classification.o: $(SRCDIR)/class_table.h
 fspage.o: $(SRCDIR)/fspage.h
-loline.o: $(SRCDIR)/loservice.h
+loline.o: $(SRCDIR)/loservice.h $(SRCDIR)/../wine/debug.h
 loservice.o: $(SRCDIR)/loservice.h
 
 debug.o: $(SRCDIR)/../wine/debug.c $(SRCDIR)/../wine/debug.h $(SRCDIR)/../wine/heap.h
