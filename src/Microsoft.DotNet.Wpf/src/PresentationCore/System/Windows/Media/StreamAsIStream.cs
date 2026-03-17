@@ -64,7 +64,8 @@ namespace System.Windows.Media
         internal CanSeek pfnCanSeek;
         internal static void StaticDispose(ref StreamDescriptor pSD)
         {
-            Debug.Assert(((IntPtr)pSD.m_handle) != IntPtr.Zero, "If this asserts fires: why is it firing. It might be legal in future.");
+            if (((IntPtr)pSD.m_handle) == IntPtr.Zero)
+                return;
             StreamAsIStream sais = (StreamAsIStream)(pSD.m_handle.Target);
             ((System.Runtime.InteropServices.GCHandle)(pSD.m_handle)).Free();
         }

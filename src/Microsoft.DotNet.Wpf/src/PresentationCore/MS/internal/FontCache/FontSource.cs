@@ -407,8 +407,8 @@ namespace MS.Internal.FontCache
             {
                 base.Dispose(disposing);
 
-                Debug.Assert(_memoryHandle.IsAllocated);
-                _memoryHandle.Free();
+                if (_memoryHandle.IsAllocated)
+                    _memoryHandle.Free();
             }
 
             private GCHandle    _memoryHandle;

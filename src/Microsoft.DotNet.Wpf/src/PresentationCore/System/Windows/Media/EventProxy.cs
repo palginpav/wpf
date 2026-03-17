@@ -37,7 +37,8 @@ namespace System.Windows.Media
 
         internal static void StaticDispose(ref EventProxyDescriptor pEPD)
         {
-            Debug.Assert(((IntPtr)pEPD.m_handle) != IntPtr.Zero, "If this asserts fires: Why is it firing? It might be legal in future.");
+            if (((IntPtr)pEPD.m_handle) == IntPtr.Zero)
+                return;
             EventProxyWrapper epw = (EventProxyWrapper)(pEPD.m_handle.Target);
             ((System.Runtime.InteropServices.GCHandle)(pEPD.m_handle)).Free();
         }

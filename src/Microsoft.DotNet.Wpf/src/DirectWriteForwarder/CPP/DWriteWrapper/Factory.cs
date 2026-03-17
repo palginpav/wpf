@@ -163,7 +163,8 @@ namespace MS.Internal.Text.TextInterface
 
 			handle = IntPtr.Zero;
 
-			_managedFactoryHandle.Free();
+			if (_managedFactoryHandle.IsAllocated)
+				_managedFactoryHandle.Free();
 
 			return true;
 		}
