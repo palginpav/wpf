@@ -10,7 +10,7 @@ namespace System.Windows.Baml2006
 {
     partial class WpfSharedBamlSchemaContext: XamlSchemaContext
     {
-        const int KnownPropertyCount = 268;
+        const int KnownPropertyCount = 270;
 
 
         private WpfKnownMember CreateKnownMember(short bamlNumber)
@@ -284,6 +284,8 @@ namespace System.Windows.Baml2006
                 case 266: return Create_BamlProperty_Window_Content();
                 case 267: return Create_BamlProperty_WrapPanel_Children();
                 case 268: return Create_BamlProperty_XmlDataProvider_XmlSerializer();
+                case 269: return Create_BamlProperty_ContentControl_ContentStringFormat();
+                case 270: return Create_BamlProperty_ContentPresenter_ContentStringFormat();
                 default:
                     throw new InvalidOperationException("Invalid BAML number");
             }
@@ -358,6 +360,7 @@ namespace System.Windows.Baml2006
                         case "ContentTemplate": return GetKnownBamlMember(-15);
                         case "ContentTemplateSelector": return GetKnownBamlMember(-16);
                         case "HasContent": return GetKnownBamlMember(-17);
+                        case "ContentStringFormat": return GetKnownBamlMember(-269);
                         default: return null;
                     }
                 case 3154930786:
@@ -374,6 +377,7 @@ namespace System.Windows.Baml2006
                         case "ContentTemplate": return GetKnownBamlMember(-21);
                         case "ContentTemplateSelector": return GetKnownBamlMember(-22);
                         case "RecognizesAccessKey": return GetKnownBamlMember(-23);
+                        case "ContentStringFormat": return GetKnownBamlMember(-270);
                         default: return null;
                     }
                 case 1367449766:
@@ -8360,6 +8364,38 @@ namespace System.Windows.Baml2006
                             true // IsAttachable
                                      );
             bamlMember.TypeConverterType = typeof(System.Windows.PropertyPathConverter);
+            bamlMember.Freeze();
+            return bamlMember;
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private WpfKnownMember Create_BamlProperty_ContentControl_ContentStringFormat()
+        {
+            Type type = typeof(System.Windows.Controls.ContentControl);
+            DependencyProperty dp = System.Windows.Controls.ContentControl.ContentStringFormatProperty;
+            var bamlMember = new WpfKnownMember( this,
+                            this.GetXamlType(typeof(System.Windows.Controls.ContentControl)),
+                            "ContentStringFormat",
+                             dp,
+                            false,
+                            false
+                                     );
+            bamlMember.Freeze();
+            return bamlMember;
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private WpfKnownMember Create_BamlProperty_ContentPresenter_ContentStringFormat()
+        {
+            Type type = typeof(System.Windows.Controls.ContentPresenter);
+            DependencyProperty dp = System.Windows.Controls.ContentPresenter.ContentStringFormatProperty;
+            var bamlMember = new WpfKnownMember( this,
+                            this.GetXamlType(typeof(System.Windows.Controls.ContentPresenter)),
+                            "ContentStringFormat",
+                             dp,
+                            false,
+                            false
+                                     );
             bamlMember.Freeze();
             return bamlMember;
         }
