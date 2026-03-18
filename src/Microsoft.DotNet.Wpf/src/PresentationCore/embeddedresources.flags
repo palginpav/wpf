@@ -1,0 +1,3 @@
+-resource:Resources/Strings.resources,SR.resources
+-resource:Resources/ColorProfiles.resources,ColorProfiles.resources
+-resource:Resources/PresentationCore.g.resources,PresentationCore.g.resources

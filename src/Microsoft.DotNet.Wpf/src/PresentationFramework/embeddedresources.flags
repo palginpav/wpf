@@ -1,0 +1,3 @@
+-resource:Resources/Strings.resources,SR.resources
+-resource:Resources/win32res/split.cur,win32res.split.cur
+-resource:Resources/win32res/splitopen.cur,win32res.splitopen.cur

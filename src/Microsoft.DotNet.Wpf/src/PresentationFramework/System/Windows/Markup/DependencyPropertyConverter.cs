@@ -244,7 +244,41 @@ namespace System.Windows.Markup
 
             if (type != null && property != null)
             {
-                return DependencyProperty.FromName(property, type);
+                dProperty = DependencyProperty.FromName(property, type);
+                if (dProperty != null)
+                    return dProperty;
+            }
+
+            // Fallback: if ambient type resolution failed but we have a property name,
+            // try common WPF base types that define well-known properties.
+            // This handles cases where mono's System.Xaml ambient provider
+            // cannot resolve the TargetType from the surrounding Style/Template context.
+            if (property != null)
+            {
+                Type[] fallbackTypes = new Type[]
+                {
+                    typeof(System.Windows.Controls.ContentControl),
+                    typeof(System.Windows.Controls.Control),
+                    typeof(System.Windows.Controls.ItemsControl),
+                    typeof(System.Windows.Controls.ContentPresenter),
+                    typeof(System.Windows.Controls.HeaderedContentControl),
+                    typeof(System.Windows.Controls.HeaderedItemsControl),
+                    typeof(System.Windows.Controls.Page),
+                    typeof(System.Windows.Controls.TextBlock),
+                    typeof(System.Windows.Controls.TextBox),
+                    typeof(System.Windows.Controls.Image),
+                    typeof(System.Windows.Controls.Border),
+                    typeof(System.Windows.Controls.Panel),
+                    typeof(System.Windows.FrameworkElement),
+                    typeof(System.Windows.UIElement),
+                };
+
+                foreach (Type fallbackType in fallbackTypes)
+                {
+                    dProperty = DependencyProperty.FromName(property, fallbackType);
+                    if (dProperty != null)
+                        return dProperty;
+                }
             }
 
             throw new NotSupportedException(SR.Get(SRID.ParserCannotConvertPropertyValue, "Property", typeof(DependencyProperty).FullName));
