@@ -392,16 +392,18 @@ namespace System.Windows
             
             int style = (int) button | (int) icon | (int) DefaultResultToButtonNumber(defaultResult, button) | (int) options;
 
-            // modal dialog notification?
-            //
-            //Application.BeginModalMessageLoop();
-            //MessageBoxResult result = Win32ToMessageBoxResult(SafeNativeMethods.MessageBox(new HandleRef(owner, handle), messageBoxText, caption, style));
-            MessageBoxResult result = Win32ToMessageBoxResult (UnsafeNativeMethods.MessageBox (new HandleRef (null, owner), messageBoxText, caption, style));
-            // modal dialog notification?
-            //
-            //Application.EndModalMessageLoop();
-
-            return result;
+            // Notify WPF dispatcher about modal state so it stops processing
+            // input for the owner window while the MessageBox is displayed.
+            System.Windows.Interop.ComponentDispatcher.PushModal();
+            try
+            {
+                MessageBoxResult result = Win32ToMessageBoxResult (UnsafeNativeMethods.MessageBox (new HandleRef (null, owner), messageBoxText, caption, style));
+                return result;
+            }
+            finally
+            {
+                System.Windows.Interop.ComponentDispatcher.PopModal();
+            }
         }
 
         private static bool IsValidMessageBoxButton(MessageBoxButton value)
