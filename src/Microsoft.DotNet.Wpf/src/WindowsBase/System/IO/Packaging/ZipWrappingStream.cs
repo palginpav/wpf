@@ -23,11 +23,25 @@ namespace System.IO.Packaging
         public ZipWrappingStream(ZipArchiveEntry zipArchiveEntry, Stream stream, FileMode packageFileMode, FileAccess packageFileAccess, bool canRead, bool canWrite)
         {
             _zipArchiveEntry = zipArchiveEntry;
-            _baseStream = stream;
             _packageFileMode = packageFileMode;
             _packageFileAccess = packageFileAccess;
             _canRead = canRead;
             _canWrite = canWrite;
+
+            // DeflateStream does not support Seek/Position/Length.
+            // Buffer it into a MemoryStream so callers that need seeking work correctly.
+            if (!stream.CanSeek && canRead)
+            {
+                MemoryStream ms = new MemoryStream();
+                CopyStream(stream, ms);
+                ms.Position = 0;
+                stream.Dispose();
+                _baseStream = ms;
+            }
+            else
+            {
+                _baseStream = stream;
+            }
         }
 
         public override bool CanRead
