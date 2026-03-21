@@ -683,6 +683,14 @@ namespace Microsoft.Windows.Shell
                     return new IntPtr((int)_GetHTFromResizeGripDirection(direction));
                 }
             }
+            else
+            {
+                // InputHitTest returned null — visual tree is empty or not hit-testable.
+                // On Wine, this commonly happens when wpfgfx rendering fails.
+                // Fall through to CLIENT instead of CAPTION to allow button clicks.
+                handled = true;
+                return new IntPtr((int)HT.CLIENT);
+            }
 
             // It's not opted out, so offer up the hittest to DWM, then to our custom non-client area logic.
             if (_chromeInfo.UseAeroCaptionButtons)
