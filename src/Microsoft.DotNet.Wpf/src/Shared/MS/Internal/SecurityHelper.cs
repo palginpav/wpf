@@ -224,6 +224,28 @@ internal static class SecurityHelper
         }
 #endif
 
+#if PRESENTATION_CORE
+        /// <summary>
+        /// Checks whether the caller has the specified permissions.
+        /// In .NET 4.x full trust, CAS is effectively disabled - always returns true.
+        /// Required by .NET Framework PresentationFramework.dll (TextBox, RichTextBox, Validation).
+        /// </summary>
+        internal static bool CallerHasPermissionWithAppDomainOptimization(params System.Security.IPermission[] permissions)
+        {
+            return true;
+        }
+
+        /// <summary>
+        /// Checks whether the caller is running in full trust.
+        /// In .NET 4.x, all desktop apps run as full trust - always returns true.
+        /// Required by .NET Framework PresentationFramework.dll (FrameworkCompatibilityPreferences).
+        /// </summary>
+        internal static bool IsFullTrustCaller()
+        {
+            return true;
+        }
+#endif
+
 #if PRESENTATION_CORE || PRESENTATIONFRAMEWORK || WINDOWS_BASE
 
         internal static bool AreStringTypesEqual(string m1, string m2)
