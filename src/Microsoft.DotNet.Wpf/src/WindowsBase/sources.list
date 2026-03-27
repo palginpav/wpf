@@ -316,6 +316,10 @@ MS/Internal/Security/RightsManagement/NativeRightsManagementAPIsConstants.cs
 MS/Internal/Security/RightsManagement/NativeRightsManagementAPIsStructures.cs
 MS/Internal/Security/RightsManagement/RightNameExpirationInfoPair.cs
 MS/Internal/Security/RightsManagement/RevocationPoint.cs
+MS/Internal/Permissions/InternalParameterlessPermissionBase.cs
+MS/Internal/Permissions/UserInitiatedRoutedEventPermission.cs
+MS/Internal/Permissions/CompoundFileIOPermission.cs
+MS/Internal/Permissions/RightsManagementPermission.cs
 System/Security/Permissions/MediaPermission.cs
 System/Security/Permissions/MediaPermissionAttribute.cs
 System/Security/Permissions/MediaPermissionAudio.cs
